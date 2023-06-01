@@ -6,7 +6,7 @@ import {
   ThemeContext,
   NavigationScreenProp,
 } from 'react-navigation';
-import { ScreenContainer } from 'react-native-screens';
+import { ScreenContainer, screensEnabled } from 'react-native-screens';
 
 import * as DrawerActions from '../routers/DrawerActions';
 import DrawerSidebar from './DrawerSidebar';
@@ -49,6 +49,7 @@ type Props = {
     contentOptions?: object;
   };
   screenProps: unknown;
+  detachInactiveScreens: boolean;
 };
 
 type State = {
@@ -60,10 +61,12 @@ type State = {
  * Component that renders the drawer.
  */
 export default class DrawerView extends React.PureComponent<Props, State> {
+  // eslint-disable-next-line react/sort-comp
   static contextType = ThemeContext;
   static defaultProps = {
     lazy: true,
   };
+  changeEvent: any;
 
   static getDerivedStateFromProps(nextProps: Props, prevState: State) {
     const { index } = nextProps.navigation.state;
@@ -90,7 +93,7 @@ export default class DrawerView extends React.PureComponent<Props, State> {
       this.handleDrawerOpen();
     }
 
-    Dimensions.addEventListener('change', this.updateWidth);
+    this.changeEvent = Dimensions.addEventListener('change', this.updateWidth);
   }
 
   componentDidUpdate(prevProps: Props) {
@@ -107,7 +110,7 @@ export default class DrawerView extends React.PureComponent<Props, State> {
   }
 
   componentWillUnmount() {
-    Dimensions.removeEventListener('change', this.updateWidth);
+    this.changeEvent.remove('change', this.updateWidth);
   }
 
   context!: React.ContextType<typeof ThemeContext>;
@@ -159,17 +162,13 @@ export default class DrawerView extends React.PureComponent<Props, State> {
         drawerOpenProgress={progress}
         navigation={this.props.navigation}
         descriptors={this.props.descriptors}
-        contentComponent={this.props.navigationConfig.contentComponent}
-        contentOptions={this.props.navigationConfig.contentOptions}
-        drawerPosition={this.props.navigationConfig.drawerPosition}
-        style={this.props.navigationConfig.style}
         {...this.props.navigationConfig}
       />
     );
   };
 
   private renderContent = () => {
-    let { lazy, navigation } = this.props;
+    let { lazy, navigation, detachInactiveScreens = true } = this.props;
     let { loaded } = this.state;
     let { routes } = navigation.state;
 
@@ -185,8 +184,11 @@ export default class DrawerView extends React.PureComponent<Props, State> {
         />
       );
     } else {
+      const enabled = screensEnabled?.() && detachInactiveScreens;
+
       return (
-        <ScreenContainer style={styles.content}>
+        // @ts-ignore
+        <ScreenContainer enabled={enabled} style={styles.content}>
           {routes.map((route, index) => {
             if (lazy && !loaded.includes(index)) {
               // Don't render a screen if we've never navigated to it
@@ -204,6 +206,7 @@ export default class DrawerView extends React.PureComponent<Props, State> {
                   { opacity: isFocused ? 1 : 0 },
                 ]}
                 isVisible={isFocused}
+                enabled={detachInactiveScreens}
               >
                 <SceneView
                   navigation={descriptor.navigation}
